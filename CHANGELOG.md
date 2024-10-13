@@ -1,3 +1,7 @@
+## 1.0.2
+
+* Added scan config to readme
+
 ## 1.0.1
 
 * Fixed readme

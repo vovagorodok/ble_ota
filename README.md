@@ -5,6 +5,13 @@ Upload firmware over bluetooth
 ## Usage
 Full example at: https://github.com/vovagorodok/ble_ota_app
 
+Scan configuration:
+```dart
+import 'package:ble_ota/ble/ble_uuids.dart';
+
+final bleScanner = bleCentral.createScanner(serviceIds: [serviceUuid]);
+```
+
 Read info:
 ```dart
 infoReader = InfoReader(bleConnector: bleConnector);
