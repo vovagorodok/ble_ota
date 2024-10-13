@@ -16,12 +16,12 @@ Upload local binary:
 ```dart
 uploader = Uploader(bleConnector: bleConnector);
 uploader.stateStream.listen((state) => print("Upload state changed: ${state.status}"));
-uploader.uploadLocalFile(localPath: localPath);
+uploader.uploadLocalFile(localPath: localPath, maxMtu: maxMtu);
 ```
 
 Upload remote binary:
 ```dart
 print("Hardware name: ${infoReader.state.deviceInfo.hardwareName}");
 if (infoReader.state.remoteInfo.newestSoftware != null)
-  uploader.uploadHttpFile(url: infoReader.state.remoteInfo.newestSoftware.path!);
+  uploader.uploadHttpFile(url: infoReader.state.remoteInfo.newestSoftware.path!, maxMtu: maxMtu);
 ```
