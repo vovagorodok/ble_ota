@@ -1,0 +1,24 @@
+name: ble_ota
+description: Upload firmware over bluetooth.
+version: 1.0.0
+homepage: https://github.com/vovagorodok/ble_ota
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+  flutter: ">=1.17.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  ble_backend: ^1.2.2
+  archive: ^3.6.1
+  meta: ^1.15.0
+  http: ^1.2.2
+  yaml: ^3.1.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
