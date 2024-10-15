@@ -1,3 +1,7 @@
+## 1.0.3
+
+* Update internal libraries
+
 ## 1.0.2
 
 * Added scan config to readme
