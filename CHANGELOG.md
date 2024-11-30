@@ -1,3 +1,7 @@
+## 1.1.0
+
+* Serial direction swap
+
 ## 1.0.3
 
 * Update internal libraries

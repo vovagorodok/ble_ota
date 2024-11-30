@@ -1,6 +1,6 @@
 const String serviceUuid = "dac890c2-35a1-11ef-aba0-9b95565f4ffb";
-const String characteristicUuidRx = "dac89194-35a1-11ef-aba1-b37714ad9a54";
-const String characteristicUuidTx = "dac89266-35a1-11ef-aba2-0f0127bce478";
+const String characteristicUuidTx = "dac89194-35a1-11ef-aba1-b37714ad9a54";
+const String characteristicUuidRx = "dac89266-35a1-11ef-aba2-0f0127bce478";
 const String characteristicUuidManufactureName =
     "dac89338-35a1-11ef-aba3-8746a2fdea8c";
 const String characteristicUuidHardwareName =
