@@ -2,33 +2,36 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:archive/archive_io.dart';
 import 'package:ble_backend/ble_connector.dart';
 import 'package:ble_backend/ble_mtu.dart';
 import 'package:ble_backend/ble_serial.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/work_state.dart';
-import 'package:ble_backend/utils/converters.dart';
-import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/ble/ble_consts.dart';
-import 'package:ble_ota/ble/ble_uuids.dart';
+import 'package:ble_ota/core/errors_map.dart';
+import 'package:ble_ota/core/errors.dart';
+import 'package:ble_ota/core/messages.dart';
 
 class BleUploader extends StatefulNotifier<BleUploadState> {
-  BleUploader(
-      {required BleConnector bleConnector, bool sequentialUpload = false})
-      : _bleMtu = bleConnector.createMtu(),
-        _bleSerial = bleConnector.createSerial(
-            serviceId: serviceUuid,
-            rxCharacteristicId: characteristicUuidRx,
-            txCharacteristicId: characteristicUuidTx),
-        _sequentialUpload = sequentialUpload;
+  BleUploader({
+    required BleConnector bleConnector,
+    required BleSerial bleSerial,
+    int? maxMtu = null,
+    bool sequentialUpload = false,
+  })  : _bleMtu = bleConnector.createMtu(),
+        _bleSerial = bleSerial,
+        _sequentialUpload = sequentialUpload,
+        _maxMtu = maxMtu;
 
   final BleMtu _bleMtu;
   final BleSerial _bleSerial;
+  final int? _maxMtu;
   final bool _sequentialUpload;
   StreamSubscription? _subscription;
   BleUploadState _state = BleUploadState();
-  Uint8List _dataToSend = Uint8List(0);
+  Uint8List _firmwareData = Uint8List(0);
+  Uint8List? _signatureData = null;
+  int? _firmwareCrc = null;
   int _currentDataPos = 0;
   int _currentBufferSize = 0;
   int _packageMaxSize = 0;
@@ -37,39 +40,244 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   @override
   BleUploadState get state => _state;
 
-  Future<void> upload({required Uint8List data, required int maxMtu}) async {
+  Future<void> upload({
+    required Uint8List firmwareData,
+    Uint8List? signatureData,
+    int? firmwareCrc,
+    int? decompressedSize,
+  }) async {
     try {
-      await _bleSerial.startNotifications();
-      _subscription = _bleSerial.dataStream.listen(_handleResp);
+      _subscription = _bleSerial.dataStream.listen(_handleMessage);
       _state = BleUploadState(status: BleUploadStatus.begin);
       notifyState(state);
-      _packageMaxSize = await _calcPackageMaxSize(maxMtu);
-      _dataToSend = data;
-      _sendBegin();
+
+      _packageMaxSize = await _calcPackageMaxSize();
+      _firmwareData = firmwareData;
+      _signatureData = signatureData;
+      _firmwareCrc = firmwareCrc;
+
+      _sendBeginReq(decompressedSize: decompressedSize);
     } catch (_) {
-      _raiseError(UploadError.generalDeviceError);
+      _raiseError(Error.deviceError);
     }
   }
 
-  @override
-  void dispose() {
+  void _handleMessage(Uint8List data) {
+    if (!Message.isValidSize(data)) {
+      _raiseError(Error.incorrectMessageSize);
+      return;
+    }
+
+    final message = Message.fromBytes(data);
+    final header = message.header;
+
+    switch (header) {
+      case HeaderCode.beginResp:
+        BeginResp.isValidSize(data)
+            ? _handleBeginResp(BeginResp.fromBytes(data))
+            : _raiseError(Error.incorrectMessageSize);
+        break;
+      case HeaderCode.packageResp:
+        PackageResp.isValidSize(data)
+            ? _handlePackageResp(PackageResp())
+            : _raiseError(Error.incorrectMessageSize);
+        break;
+      case HeaderCode.signatureResp:
+        SignatureResp.isValidSize(data)
+            ? _handleSignatureResp(SignatureResp())
+            : _raiseError(Error.incorrectMessageSize);
+        break;
+      case HeaderCode.endResp:
+        EndResp.isValidSize(data)
+            ? _handleEndResp(EndResp())
+            : _raiseError(Error.incorrectMessageSize);
+        break;
+      case HeaderCode.uploadEnableInd:
+        if (!UploadEnableInd.isValidSize(data))
+          _raiseError(Error.incorrectMessageSize);
+        break;
+      case HeaderCode.uploadDisableInd:
+        if (!UploadDisableInd.isValidSize(data))
+          _raiseError(Error.incorrectMessageSize);
+        break;
+      case HeaderCode.errorInd:
+        _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code));
+        break;
+      default:
+        _raiseError(
+          Error.unexpectedDeviceResponse,
+          errorCode: header,
+        );
+    }
+  }
+
+  void _sendBeginReq({int? decompressedSize}) {
+    final isCompressed = decompressedSize != null;
+
+    final beginReq = BeginReq(
+      firmwareSize: isCompressed ? decompressedSize : _firmwareData.length,
+      packageSize: _packageMaxSize,
+      bufferSize: MaxValue.uint32,
+      compressedSize: isCompressed ? _firmwareData.length : 0,
+      flags: BeginReqFlags(
+        compression: isCompressed,
+        checksum: _firmwareCrc != null,
+      ),
+    );
+
+    _sendMessage(beginReq.toBytes());
+    _waitMessage();
+  }
+
+  void _handleBeginResp(BeginResp resp) {
+    if (state.status != BleUploadStatus.begin) {
+      _raiseError(
+        Error.unexpectedDeviceResponse,
+        errorCode: resp.header,
+      );
+      return;
+    }
+
+    state.status = BleUploadStatus.upload;
+    notifyState(state);
+
+    _currentDataPos = 0;
+    _currentBufferSize = 0;
+    _packageMaxSize = resp.packageSize;
+    _bufferMaxSize = resp.bufferSize;
+
+    _sendPackages();
+  }
+
+  void _sendPackages() async {
+    while (_currentDataPos < _firmwareData.length) {
+      final packageData = _getPackege(_firmwareData);
+      final packageSize = packageData.length;
+      _currentDataPos += packageSize;
+      _currentBufferSize += packageSize;
+      final isBufferFull = _currentBufferSize > _bufferMaxSize;
+
+      final package = isBufferFull
+          ? PackageReq(data: packageData)
+          : PackageInd(data: packageData);
+
+      _sequentialUpload
+          ? await _sendMessage(package.toBytes())
+          : _sendMessage(package.toBytes());
+
+      state.progress =
+          _currentDataPos.toDouble() / _firmwareData.length.toDouble();
+      notifyState(state);
+
+      if (isBufferFull) {
+        _currentBufferSize = packageSize;
+        _waitMessage();
+        return;
+      }
+    }
+
+    if (_signatureData == null) {
+      _sendEndReq();
+    } else {
+      _currentDataPos = 0;
+      _sendSignature();
+    }
+  }
+
+  void _handlePackageResp(PackageResp resp) {
+    if (state.status != BleUploadStatus.upload) {
+      _raiseError(
+        Error.unexpectedDeviceResponse,
+        errorCode: resp.header,
+      );
+      return;
+    }
+
+    _sendPackages();
+  }
+
+  void _sendSignature() async {
+    if (_signatureData == null) {
+      _raiseError(Error.signatureNotSupported);
+      return;
+    }
+    final signatureData = _signatureData!;
+    if (_currentDataPos > signatureData.length) {
+      _raiseError(Error.incorrectSignatureSize);
+      return;
+    }
+    if (_currentDataPos == signatureData.length) {
+      _sendEndReq();
+      return;
+    }
+
+    final packageData = _getPackege(signatureData);
+    _currentDataPos += packageData.length;
+
+    _sendMessage(SignatureReq(data: packageData).toBytes());
+    _waitMessage();
+  }
+
+  void _handleSignatureResp(SignatureResp resp) {
+    if (state.status != BleUploadStatus.upload) {
+      _raiseError(
+        Error.unexpectedDeviceResponse,
+        errorCode: resp.header,
+      );
+      return;
+    }
+
+    _sendSignature();
+  }
+
+  void _sendEndReq() {
+    _sendMessage(EndReq(firmwareCrc: _firmwareCrc ?? 0).toBytes());
+    state.status = BleUploadStatus.end;
+    _waitMessage();
+  }
+
+  void _handleEndResp(EndResp resp) {
+    if (state.status != BleUploadStatus.end) {
+      _raiseError(
+        Error.unexpectedDeviceResponse,
+        errorCode: resp.header,
+      );
+      return;
+    }
+
     _unsubscribe();
-    _bleSerial.dispose();
-    super.dispose();
+    _firmwareData = Uint8List(0);
+    state.status = BleUploadStatus.success;
+    notifyState(state);
   }
 
-  Future<int> _calcPackageMaxSize(int maxMtu) async {
+  Future<int> _calcPackageMaxSize() async {
+    if (_maxMtu == null) return MaxValue.uint32;
+
     final mtu = _bleMtu.isRequestSupported
-        ? await _bleMtu.request(mtu: maxMtu)
-        : maxMtu;
-    return mtu - mtuWriteOverheadBytesNum - headCodeBytesNum;
+        ? await _bleMtu.request(mtu: _maxMtu!)
+        : _maxMtu!;
+
+    return mtu - mtuWriteOverheadSize - headerSize;
   }
 
-  Future<void> _send(int head, Uint8List data) async {
-    await _bleSerial.send(data: Uint8List.fromList(uint8ToBytes(head) + data));
+  Uint8List _getPackege(Uint8List data) {
+    final packageSize = min(data.length - _currentDataPos, _packageMaxSize);
+    final packageEndPos = _currentDataPos + packageSize;
+    final packageData = data.sublist(_currentDataPos, packageEndPos);
+    return packageData;
   }
 
-  void _raiseError(UploadError error, {int errorCode = 0}) {
+  Future<void> _sendMessage(Uint8List data) async {
+    await _bleSerial.send(data: data);
+  }
+
+  void _waitMessage() {
+    _bleSerial.waitData(
+        timeoutCallback: () => _raiseError(Error.noDeviceResponse));
+  }
+
+  void _raiseError(Error error, {int errorCode = 0}) {
     _unsubscribe();
     state.status = BleUploadStatus.error;
     state.error = error;
@@ -77,93 +285,21 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
     notifyState(state);
   }
 
-  void _waitForResponse() {
-    _bleSerial.waitData(
-        timeoutCallback: () => _raiseError(UploadError.noDeviceResponse));
-  }
-
-  void _sendBegin() {
-    _send(HeadCode.begin, uint32ToBytes(_dataToSend.length));
-    _waitForResponse();
-  }
-
-  void _handleResp(Uint8List data) {
-    final headCode = bytesToUint8(data, headCodePos);
-    if (headCode == HeadCode.ok) {
-      if (state.status == BleUploadStatus.begin) {
-        _handleBeginResp(data);
-        _sendPackages();
-      } else if (state.status == BleUploadStatus.upload) {
-        _sendPackages();
-      } else if (state.status == BleUploadStatus.end) {
-        _unsubscribe();
-        _dataToSend = Uint8List(0);
-        state.status = BleUploadStatus.success;
-        notifyState(state);
-      } else {
-        _raiseError(UploadError.unexpectedDeviceResponse);
-      }
-    } else {
-      _raiseError(
-        determineErrorHeadCode(headCode),
-        errorCode: headCode,
-      );
-    }
-  }
-
-  void _handleBeginResp(Uint8List data) {
-    state.status = BleUploadStatus.upload;
-    notifyState(state);
-    _currentDataPos = 0;
-    _currentBufferSize = 0;
-    _packageMaxSize = min(
-        _packageMaxSize, bytesToUint32(data, attrSizePos) - headCodeBytesNum);
-    _bufferMaxSize = bytesToUint32(data, bufferSizePos);
-  }
-
-  void _sendPackages() async {
-    while (_currentDataPos < _dataToSend.length) {
-      final packageSize =
-          min(_dataToSend.length - _currentDataPos, _packageMaxSize);
-      final packageEndPos = _currentDataPos + packageSize;
-      final package = _dataToSend.sublist(_currentDataPos, packageEndPos);
-
-      _sequentialUpload
-          ? await _send(HeadCode.package, package)
-          : _send(HeadCode.package, package);
-      _currentDataPos = packageEndPos;
-
-      state.progress =
-          _currentDataPos.toDouble() / _dataToSend.length.toDouble();
-      notifyState(state);
-
-      _currentBufferSize += packageSize;
-      if (_currentBufferSize > _bufferMaxSize) {
-        _currentBufferSize = packageSize;
-        _waitForResponse();
-        return;
-      }
-    }
-
-    _sendEnd();
-  }
-
-  void _sendEnd() {
-    _send(HeadCode.end, uint32ToBytes(getCrc32(_dataToSend)));
-    state.status = BleUploadStatus.end;
-    _waitForResponse();
-  }
-
   void _unsubscribe() {
-    _bleSerial.stopNotifications();
     _subscription?.cancel();
+  }
+
+  @override
+  void dispose() {
+    _unsubscribe();
+    super.dispose();
   }
 }
 
-class BleUploadState extends WorkState<BleUploadStatus, UploadError> {
+class BleUploadState extends WorkState<BleUploadStatus, Error> {
   BleUploadState({
     super.status = BleUploadStatus.idle,
-    super.error = UploadError.unknown,
+    super.error = Error.unknown,
     this.progress = 0.0,
   });
 

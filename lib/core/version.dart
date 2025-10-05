@@ -8,7 +8,7 @@ class Version {
     this.patch = 0,
   });
 
-  static Version fromList(list) => Version(
+  factory Version.fromList(list) => Version(
         major: list[0],
         minor: list[1],
         patch: list[2],

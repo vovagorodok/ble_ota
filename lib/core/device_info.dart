@@ -1,5 +1,5 @@
-import 'package:meta/meta.dart';
 import 'package:ble_ota/core/version.dart';
+import 'package:meta/meta.dart';
 
 @immutable
 class DeviceInfo {
@@ -9,6 +9,7 @@ class DeviceInfo {
     this.hardwareVersion = const Version(),
     this.softwareName = "",
     this.softwareVersion = const Version(),
+    this.isAvailable = false,
   });
 
   final String manufactureName;
@@ -16,4 +17,5 @@ class DeviceInfo {
   final Version hardwareVersion;
   final String softwareName;
   final Version softwareVersion;
+  final bool isAvailable;
 }

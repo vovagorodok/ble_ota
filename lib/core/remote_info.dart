@@ -8,7 +8,7 @@ class RemoteInfo {
     this.hardwarePage,
     this.softwareList = const [],
     this.newestSoftware,
-    this.isHardwareUnregistered = false,
+    this.isAvailable = false,
   });
 
   String hardwareName;
@@ -17,5 +17,5 @@ class RemoteInfo {
   String? hardwarePage;
   List<Software> softwareList;
   Software? newestSoftware;
-  bool isHardwareUnregistered;
+  bool isAvailable;
 }
