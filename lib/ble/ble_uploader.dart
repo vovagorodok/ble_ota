@@ -16,16 +16,16 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   BleUploader({
     required BleConnector bleConnector,
     required BleSerial bleSerial,
-    int? maxMtu = null,
+    int? maxMtuSize = null,
     bool sequentialUpload = false,
   })  : _bleMtu = bleConnector.createMtu(),
         _bleSerial = bleSerial,
         _sequentialUpload = sequentialUpload,
-        _maxMtu = maxMtu;
+        _maxMtuSize = maxMtuSize;
 
   final BleMtu _bleMtu;
   final BleSerial _bleSerial;
-  final int? _maxMtu;
+  final int? _maxMtuSize;
   final bool _sequentialUpload;
   StreamSubscription? _subscription;
   BleUploadState _state = BleUploadState();
@@ -252,11 +252,11 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   }
 
   Future<int> _calcPackageMaxSize() async {
-    if (_maxMtu == null) return MaxValue.uint32;
+    if (_maxMtuSize == null) return MaxValue.uint32;
 
     final mtu = _bleMtu.isRequestSupported
-        ? await _bleMtu.request(mtu: _maxMtu!)
-        : _maxMtu!;
+        ? await _bleMtu.request(mtu: _maxMtuSize!)
+        : _maxMtuSize!;
 
     return mtu - mtuWriteOverheadSize - headerSize;
   }

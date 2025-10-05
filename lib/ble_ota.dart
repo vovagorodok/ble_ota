@@ -25,7 +25,7 @@ class BleOta extends StatefulNotifier<BleOtaState> {
   BleOta({
     required BleConnector bleConnector,
     String? manufacturesDictUrl = null,
-    int? maxMtu = null,
+    int? maxMtuSize = null,
     bool skipInfoReading = false,
     bool sequentialUpload = false,
   })  : _bleSerial = bleConnector.createSerial(
@@ -40,7 +40,7 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     _bleUploader = BleUploader(
         bleConnector: bleConnector,
         bleSerial: _bleSerial,
-        maxMtu: maxMtu,
+        maxMtuSize: maxMtuSize,
         sequentialUpload: sequentialUpload);
     _blePinChanger = BlePinChanger(bleSerial: _bleSerial);
     _bleFlagsObserver = BleFlagsObserver(bleSerial: _bleSerial);
