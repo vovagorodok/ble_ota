@@ -17,25 +17,28 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
     required BleConnector bleConnector,
     required BleSerial bleSerial,
     int? maxMtuSize = null,
+    int? maxBufferSize = null,
     bool sequentialUpload = false,
   })  : _bleMtu = bleConnector.createMtu(),
         _bleSerial = bleSerial,
         _sequentialUpload = sequentialUpload,
+        _maxBufferSize = maxBufferSize,
         _maxMtuSize = maxMtuSize;
 
   final BleMtu _bleMtu;
   final BleSerial _bleSerial;
   final int? _maxMtuSize;
+  final int? _maxBufferSize;
   final bool _sequentialUpload;
   StreamSubscription? _subscription;
   BleUploadState _state = BleUploadState();
   Uint8List _firmwareData = Uint8List(0);
   Uint8List? _signatureData = null;
   int? _firmwareCrc = null;
+  int _packageSize = 0;
+  int _bufferSize = 0;
   int _currentDataPos = 0;
   int _currentBufferSize = 0;
-  int _packageMaxSize = 0;
-  int _bufferMaxSize = 0;
 
   @override
   BleUploadState get state => _state;
@@ -51,7 +54,8 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
       _state = BleUploadState(status: BleUploadStatus.begin);
       notifyState(state);
 
-      _packageMaxSize = await _calcPackageMaxSize();
+      _packageSize = await _calcMaxPackageSize();
+      _bufferSize = _calcMaxBufferSize();
       _firmwareData = firmwareData;
       _signatureData = signatureData;
       _firmwareCrc = firmwareCrc;
@@ -116,8 +120,8 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
 
     final beginReq = BeginReq(
       firmwareSize: isCompressed ? decompressedSize : _firmwareData.length,
-      packageSize: _packageMaxSize,
-      bufferSize: MaxValue.uint32,
+      packageSize: _packageSize,
+      bufferSize: _bufferSize,
       compressedSize: isCompressed ? _firmwareData.length : 0,
       flags: BeginReqFlags(
         compression: isCompressed,
@@ -141,10 +145,10 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
     state.status = BleUploadStatus.upload;
     notifyState(state);
 
+    _packageSize = resp.packageSize;
+    _bufferSize = resp.bufferSize;
     _currentDataPos = 0;
     _currentBufferSize = 0;
-    _packageMaxSize = resp.packageSize;
-    _bufferMaxSize = resp.bufferSize;
 
     _sendPackages();
   }
@@ -155,7 +159,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
       final packageSize = packageData.length;
       _currentDataPos += packageSize;
       _currentBufferSize += packageSize;
-      final isBufferFull = _currentBufferSize > _bufferMaxSize;
+      final isBufferFull = _currentBufferSize > _bufferSize;
 
       final package = isBufferFull
           ? PackageReq(data: packageData)
@@ -251,7 +255,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
     notifyState(state);
   }
 
-  Future<int> _calcPackageMaxSize() async {
+  Future<int> _calcMaxPackageSize() async {
     if (_maxMtuSize == null) return MaxValue.uint32;
 
     final mtu = _bleMtu.isRequestSupported
@@ -261,8 +265,12 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
     return mtu - mtuWriteOverheadSize - headerSize;
   }
 
+  int _calcMaxBufferSize() {
+    return _maxBufferSize ?? MaxValue.uint32;
+  }
+
   Uint8List _getPackege(Uint8List data) {
-    final packageSize = min(data.length - _currentDataPos, _packageMaxSize);
+    final packageSize = min(data.length - _currentDataPos, _packageSize);
     final packageEndPos = _currentDataPos + packageSize;
     final packageData = data.sublist(_currentDataPos, packageEndPos);
     return packageData;
