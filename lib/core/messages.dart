@@ -1,30 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:ble_backend/utils/converters.dart';
-
-List<bool> byteToBits(int byte, int size) {
-  return List.generate(size, (i) => (byte & (1 << i)) != 0);
-}
-
-int bitsToByte(List<bool> bits) {
-  int value = 0;
-  for (int i = 0; i < bits.length; i++) {
-    if (bits[i]) value |= (1 << i);
-  }
-  return value;
-}
-
-class MaxValue {
-  static const uint8 = 0xFF;
-  static const uint16 = 0xFFFF;
-  static const uint32 = 0xFFFFFFFF;
-}
-
-class BytesSize {
-  static const uint8 = 1;
-  static const uint16 = 2;
-  static const uint32 = 4;
-}
+import 'package:ble_backend/utils/serialization.dart';
 
 const headerSize = BytesSize.uint8;
 

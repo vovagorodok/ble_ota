@@ -6,6 +6,7 @@ import 'package:ble_backend/ble_connector.dart';
 import 'package:ble_backend/ble_mtu.dart';
 import 'package:ble_backend/ble_serial.dart';
 import 'package:ble_backend/state_notifier.dart';
+import 'package:ble_backend/utils/serialization.dart';
 import 'package:ble_backend/work_state.dart';
 import 'package:ble_ota/ble/ble_consts.dart';
 import 'package:ble_ota/core/errors_map.dart';
