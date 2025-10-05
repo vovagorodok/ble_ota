@@ -85,7 +85,7 @@ class Message {
     return Message(header: bytesToUint8(data, 0));
   }
 
-  static bool isValidSize(Uint8List data) => data.length >= BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length >= headerSize;
 }
 
 class InitReq extends Message {
@@ -138,7 +138,7 @@ class InitResp extends Message {
 
   static bool isValidSize(Uint8List data) => data.length == _size;
 
-  static const int _flagsOffset = BytesSize.uint8;
+  static const int _flagsOffset = headerSize;
   static const int _size = _flagsOffset + BytesSize.uint8;
 }
 
@@ -202,7 +202,7 @@ class BeginResp extends Message {
 
   static bool isValidSize(Uint8List data) => data.length == _size;
 
-  static const int _packageSizeOffset = BytesSize.uint8;
+  static const int _packageSizeOffset = headerSize;
   static const int _bufferSizeOffset = _packageSizeOffset + BytesSize.uint32;
   static const int _size = _bufferSizeOffset + BytesSize.uint32;
 }
@@ -235,7 +235,7 @@ class PackageReq extends Package {
 class PackageResp extends Message {
   PackageResp() : super(header: HeaderCode.packageResp);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
 
 class EndReq extends Message {
@@ -254,7 +254,7 @@ class EndReq extends Message {
 class EndResp extends Message {
   EndResp() : super(header: HeaderCode.endResp);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
 
 class ErrorInd extends Message {
@@ -272,20 +272,20 @@ class ErrorInd extends Message {
 
   static bool isValidSize(Uint8List data) => data.length == _size;
 
-  static const int _codeOffset = BytesSize.uint8;
+  static const int _codeOffset = headerSize;
   static const int _size = _codeOffset + BytesSize.uint8;
 }
 
 class UploadEnableInd extends Message {
   UploadEnableInd() : super(header: HeaderCode.uploadEnableInd);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
 
 class UploadDisableInd extends Message {
   UploadDisableInd() : super(header: HeaderCode.uploadDisableInd);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
 
 class SignatureReq extends Package {
@@ -297,7 +297,7 @@ class SignatureReq extends Package {
 class SignatureResp extends Message {
   SignatureResp() : super(header: HeaderCode.signatureResp);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
 
 class SetPinReq extends Message {
@@ -316,7 +316,7 @@ class SetPinReq extends Message {
 class SetPinResp extends Message {
   SetPinResp() : super(header: HeaderCode.setPinResp);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
 
 class RemovePinReq extends Message {
@@ -328,5 +328,5 @@ class RemovePinReq extends Message {
 class RemovePinResp extends Message {
   RemovePinResp() : super(header: HeaderCode.removePinResp);
 
-  static bool isValidSize(Uint8List data) => data.length == BytesSize.uint8;
+  static bool isValidSize(Uint8List data) => data.length == headerSize;
 }
