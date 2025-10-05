@@ -48,7 +48,9 @@ class BleFlagsReader extends StatefulNotifier<DeviceFlagsState> {
             : _raiseError(Error.incorrectMessageSize);
         break;
       case HeaderCode.errorInd:
-        _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code));
+        ErrorInd.isValidSize(data)
+            ? _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code))
+            : _raiseError(Error.incorrectMessageSize);
         break;
       default:
         _raiseError(
