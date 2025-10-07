@@ -1,5 +1,5 @@
-class DeviceFlags {
-  DeviceFlags({
+class DeviceCapabilities {
+  DeviceCapabilities({
     this.compressionSupported = false,
     this.checksumSupported = false,
     this.uploadEnabled = false,

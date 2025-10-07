@@ -8,13 +8,13 @@ import 'package:ble_backend/ble_serial.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/utils/serialization.dart';
 import 'package:ble_backend/work_state.dart';
-import 'package:ble_ota/ble/ble_consts.dart';
+import 'package:ble_ota/ble/consts.dart';
 import 'package:ble_ota/core/errors_map.dart';
 import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/messages.dart';
 
-class BleUploader extends StatefulNotifier<BleUploadState> {
-  BleUploader({
+class Uploader extends StatefulNotifier<UploadState> {
+  Uploader({
     required BleConnector bleConnector,
     required BleSerial bleSerial,
     int? maxMtuSize = null,
@@ -32,7 +32,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   final int? _maxBufferSize;
   final bool _sequentialUpload;
   StreamSubscription? _subscription;
-  BleUploadState _state = BleUploadState();
+  UploadState _state = UploadState();
   Uint8List _firmwareData = Uint8List(0);
   Uint8List? _signatureData = null;
   int? _firmwareCrc = null;
@@ -42,7 +42,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   int _currentBufferSize = 0;
 
   @override
-  BleUploadState get state => _state;
+  UploadState get state => _state;
 
   Future<void> upload({
     required Uint8List firmwareData,
@@ -52,7 +52,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   }) async {
     try {
       _subscription = _bleSerial.dataStream.listen(_handleMessage);
-      _state = BleUploadState(status: BleUploadStatus.begin);
+      _state = UploadState(status: UploadStatus.begin);
       notifyState(state);
 
       _packageSize = await _calcMaxPackageSize();
@@ -137,7 +137,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   }
 
   void _handleBeginResp(BeginResp resp) {
-    if (state.status != BleUploadStatus.begin) {
+    if (state.status != UploadStatus.begin) {
       _raiseError(
         Error.unexpectedDeviceResponse,
         errorCode: resp.header,
@@ -145,7 +145,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
       return;
     }
 
-    state.status = BleUploadStatus.upload;
+    state.status = UploadStatus.upload;
     notifyState(state);
 
     _packageSize = resp.packageSize;
@@ -192,7 +192,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   }
 
   void _handlePackageResp(PackageResp resp) {
-    if (state.status != BleUploadStatus.upload) {
+    if (state.status != UploadStatus.upload) {
       _raiseError(
         Error.unexpectedDeviceResponse,
         errorCode: resp.header,
@@ -226,7 +226,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   }
 
   void _handleSignatureResp(SignatureResp resp) {
-    if (state.status != BleUploadStatus.upload) {
+    if (state.status != UploadStatus.upload) {
       _raiseError(
         Error.unexpectedDeviceResponse,
         errorCode: resp.header,
@@ -239,12 +239,12 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
 
   void _sendEndReq() {
     _sendMessage(EndReq(firmwareCrc: _firmwareCrc ?? 0).toBytes());
-    state.status = BleUploadStatus.end;
+    state.status = UploadStatus.end;
     _waitMessage();
   }
 
   void _handleEndResp(EndResp resp) {
-    if (state.status != BleUploadStatus.end) {
+    if (state.status != UploadStatus.end) {
       _raiseError(
         Error.unexpectedDeviceResponse,
         errorCode: resp.header,
@@ -254,7 +254,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
 
     _unsubscribe();
     _firmwareData = Uint8List(0);
-    state.status = BleUploadStatus.success;
+    state.status = UploadStatus.success;
     notifyState(state);
   }
 
@@ -290,7 +290,7 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
 
   void _raiseError(Error error, {int errorCode = 0}) {
     _unsubscribe();
-    state.status = BleUploadStatus.error;
+    state.status = UploadStatus.error;
     state.error = error;
     state.errorCode = errorCode;
     notifyState(state);
@@ -307,9 +307,9 @@ class BleUploader extends StatefulNotifier<BleUploadState> {
   }
 }
 
-class BleUploadState extends WorkState<BleUploadStatus, Error> {
-  BleUploadState({
-    super.status = BleUploadStatus.idle,
+class UploadState extends WorkState<UploadStatus, Error> {
+  UploadState({
+    super.status = UploadStatus.idle,
     super.error = Error.unknown,
     this.progress = 0.0,
   });
@@ -317,7 +317,7 @@ class BleUploadState extends WorkState<BleUploadStatus, Error> {
   double progress;
 }
 
-enum BleUploadStatus {
+enum UploadStatus {
   idle,
   begin,
   upload,

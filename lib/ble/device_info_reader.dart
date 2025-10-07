@@ -2,14 +2,14 @@ import 'package:ble_backend/ble_characteristic.dart';
 import 'package:ble_backend/ble_connector.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/work_state.dart';
-import 'package:ble_ota/ble/ble_uuids.dart';
+import 'package:ble_ota/ble/uuids.dart';
 import 'package:ble_ota/core/device_info.dart';
 import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/state.dart';
 import 'package:ble_ota/core/version.dart';
 
-class BleInfoReader extends StatefulNotifier<DeviceInfoState> {
-  BleInfoReader({required BleConnector bleConnector})
+class DeviceInfoReader extends StatefulNotifier<DeviceInfoState> {
+  DeviceInfoReader({required BleConnector bleConnector})
       : _characteristicManufactureName = bleConnector.createCharacteristic(
             serviceId: serviceUuid,
             characteristicId: characteristicUuidManufactureName),

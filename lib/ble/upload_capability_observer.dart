@@ -9,15 +9,16 @@ import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/messages.dart';
 import 'package:ble_ota/core/state.dart';
 
-class BleFlagsObserver extends StatefulNotifier<DeviceObserverState> {
-  BleFlagsObserver({required BleSerial bleSerial}) : _bleSerial = bleSerial;
+class UploadCapabilityObserver extends StatefulNotifier<UploadCapabilityState> {
+  UploadCapabilityObserver({required BleSerial bleSerial})
+      : _bleSerial = bleSerial;
 
   final BleSerial _bleSerial;
   StreamSubscription? _subscription;
-  DeviceObserverState _state = DeviceObserverState(uploadEnabled: false);
+  UploadCapabilityState _state = UploadCapabilityState(uploadEnabled: false);
 
   @override
-  DeviceObserverState get state => _state;
+  UploadCapabilityState get state => _state;
 
   void start({required bool uploadEnabled}) {
     _subscription = _bleSerial.dataStream.listen(_handleMessage);
@@ -94,8 +95,8 @@ class BleFlagsObserver extends StatefulNotifier<DeviceObserverState> {
   }
 }
 
-class DeviceObserverState extends State {
-  DeviceObserverState({
+class UploadCapabilityState extends State {
+  UploadCapabilityState({
     super.status = WorkStatus.idle,
     super.error = Error.unknown,
     required this.uploadEnabled,

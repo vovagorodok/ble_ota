@@ -7,7 +7,7 @@ Full example at: https://github.com/vovagorodok/ble_ota_app
 
 Scan configuration:
 ```dart
-import 'package:ble_ota/ble/ble_uuids.dart';
+import 'package:ble_ota/ble/uuids.dart';
 
 final bleScanner = bleCentral.createScanner(serviceIds: [serviceUuid]);
 ```

@@ -8,15 +8,15 @@ import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/messages.dart';
 import 'package:ble_ota/core/state.dart';
 
-class BlePinChanger extends StatefulNotifier<BlePinChangeState> {
-  BlePinChanger({required BleSerial bleSerial}) : _bleSerial = bleSerial;
+class PinChanger extends StatefulNotifier<PinChangeState> {
+  PinChanger({required BleSerial bleSerial}) : _bleSerial = bleSerial;
 
   final BleSerial _bleSerial;
   StreamSubscription? _subscription;
-  BlePinChangeState _state = BlePinChangeState();
+  PinChangeState _state = PinChangeState();
 
   @override
-  BlePinChangeState get state => _state;
+  PinChangeState get state => _state;
 
   void set({required int pin}) {
     _begin();
@@ -62,7 +62,7 @@ class BlePinChanger extends StatefulNotifier<BlePinChangeState> {
   void _begin() {
     _subscription = _bleSerial.dataStream.listen(_handleMessage);
 
-    _state = BlePinChangeState(status: WorkStatus.working);
+    _state = PinChangeState(status: WorkStatus.working);
     notifyState(state);
   }
 
@@ -94,8 +94,8 @@ class BlePinChanger extends StatefulNotifier<BlePinChangeState> {
   }
 }
 
-class BlePinChangeState extends State {
-  BlePinChangeState({
+class PinChangeState extends State {
+  PinChangeState({
     super.status = WorkStatus.idle,
     super.error = Error.unknown,
   });

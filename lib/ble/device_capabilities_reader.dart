@@ -4,28 +4,31 @@ import 'dart:typed_data';
 import 'package:ble_backend/ble_serial.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/work_state.dart';
-import 'package:ble_ota/core/device_flags.dart';
+import 'package:ble_ota/core/device_capabilities.dart';
 import 'package:ble_ota/core/errors_map.dart';
 import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/messages.dart';
 import 'package:ble_ota/core/state.dart';
 
-class BleFlagsReader extends StatefulNotifier<DeviceFlagsState> {
-  BleFlagsReader({required BleSerial bleSerial}) : _bleSerial = bleSerial;
+class DeviceCapabilitiesReader
+    extends StatefulNotifier<DeviceCapabilitiesState> {
+  DeviceCapabilitiesReader({required BleSerial bleSerial})
+      : _bleSerial = bleSerial;
 
   final BleSerial _bleSerial;
   StreamSubscription? _subscription;
-  DeviceFlagsState _state = DeviceFlagsState(flags: DeviceFlags());
+  DeviceCapabilitiesState _state =
+      DeviceCapabilitiesState(capabilities: DeviceCapabilities());
 
   @override
-  DeviceFlagsState get state => _state;
+  DeviceCapabilitiesState get state => _state;
 
   void read() {
     _subscription = _bleSerial.dataStream.listen(_handleMessage);
 
-    _state = DeviceFlagsState(
+    _state = DeviceCapabilitiesState(
       status: WorkStatus.working,
-      flags: DeviceFlags(),
+      capabilities: DeviceCapabilities(),
     );
     notifyState(state);
 
@@ -69,7 +72,7 @@ class BleFlagsReader extends StatefulNotifier<DeviceFlagsState> {
     _unsubscribe();
 
     final flags = resp.flags;
-    state.flags = DeviceFlags(
+    state.capabilities = DeviceCapabilities(
       compressionSupported: flags.compression,
       checksumSupported: flags.checksum,
       uploadEnabled: flags.upload,
@@ -109,12 +112,12 @@ class BleFlagsReader extends StatefulNotifier<DeviceFlagsState> {
   }
 }
 
-class DeviceFlagsState extends State {
-  DeviceFlagsState({
+class DeviceCapabilitiesState extends State {
+  DeviceCapabilitiesState({
     super.status = WorkStatus.idle,
     super.error = Error.unknown,
-    required this.flags,
+    required this.capabilities,
   });
 
-  DeviceFlags flags;
+  DeviceCapabilities capabilities;
 }

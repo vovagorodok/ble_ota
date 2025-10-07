@@ -11,7 +11,7 @@ import 'package:ble_ota/core/state.dart';
 import 'package:http/http.dart' as http;
 import 'package:yaml/yaml.dart';
 
-class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
+class RemoteInfoReader extends StatefulNotifier<RemoteInfoState> {
   RemoteInfoState _state = RemoteInfoState(info: RemoteInfo());
 
   @override

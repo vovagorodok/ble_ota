@@ -5,20 +5,20 @@ import 'package:ble_backend/ble_connector.dart';
 import 'package:ble_backend/ble_serial.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/work_state.dart';
-import 'package:ble_ota/ble/ble_flags_observer.dart';
-import 'package:ble_ota/ble/ble_flags_reader.dart';
-import 'package:ble_ota/ble/ble_info_reader.dart';
-import 'package:ble_ota/ble/ble_pin_changer.dart';
-import 'package:ble_ota/ble/ble_uploader.dart';
-import 'package:ble_ota/ble/ble_uuids.dart';
+import 'package:ble_ota/ble/device_capabilities_reader.dart';
+import 'package:ble_ota/ble/device_info_reader.dart';
+import 'package:ble_ota/ble/pin_changer.dart';
+import 'package:ble_ota/ble/upload_capability_observer.dart';
+import 'package:ble_ota/ble/uploader.dart';
+import 'package:ble_ota/ble/uuids.dart';
 import 'package:ble_ota/core/compression.dart';
 import 'package:ble_ota/core/crc.dart';
-import 'package:ble_ota/core/device_flags.dart';
+import 'package:ble_ota/core/device_capabilities.dart';
 import 'package:ble_ota/core/device_info.dart';
 import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/remote_info.dart';
 import 'package:ble_ota/core/signature.dart';
-import 'package:ble_ota/http/http_info_reader.dart';
+import 'package:ble_ota/http/remote_info_reader.dart';
 import 'package:http/http.dart' as http;
 
 class BleOta extends StatefulNotifier<BleOtaState> {
@@ -35,37 +35,39 @@ class BleOta extends StatefulNotifier<BleOtaState> {
             txCharacteristicId: characteristicUuidTx),
         _manufacturesDictUrl = manufacturesDictUrl,
         _skipInfoReading = skipInfoReading {
-    _bleFlagsReader = BleFlagsReader(bleSerial: _bleSerial);
-    _bleInfoReader = BleInfoReader(bleConnector: bleConnector);
-    _httpInfoReader = HttpInfoReader();
-    _bleUploader = BleUploader(
+    _deviceCapabilitiesReader = DeviceCapabilitiesReader(bleSerial: _bleSerial);
+    _deviceInfoReader = DeviceInfoReader(bleConnector: bleConnector);
+    _remoteInfoReader = RemoteInfoReader();
+    _uploader = Uploader(
         bleConnector: bleConnector,
         bleSerial: _bleSerial,
         maxMtuSize: maxMtuSize,
         maxBufferSize: maxBufferSize,
         sequentialUpload: sequentialUpload);
-    _blePinChanger = BlePinChanger(bleSerial: _bleSerial);
-    _bleFlagsObserver = BleFlagsObserver(bleSerial: _bleSerial);
+    _pinChanger = PinChanger(bleSerial: _bleSerial);
+    _uploadCapabilityObserver = UploadCapabilityObserver(bleSerial: _bleSerial);
 
-    _bleFlagsReader.stateStream.listen(_onDeviceFlagsStateChanged);
-    _bleInfoReader.stateStream.listen(_onDeviceInfoStateChanged);
-    _httpInfoReader.stateStream.listen(_onRemoteInfoStateChanged);
-    _bleUploader.stateStream.listen(_onBleUploadStateChanged);
-    _blePinChanger.stateStream.listen(_onBlePinChangeStateChanged);
-    _bleFlagsObserver.stateStream.listen(_onDeviceObserverStateChanged);
+    _deviceCapabilitiesReader.stateStream
+        .listen(_onDeviceCapabilitiesStateChanged);
+    _deviceInfoReader.stateStream.listen(_onDeviceInfoStateChanged);
+    _remoteInfoReader.stateStream.listen(_onRemoteInfoStateChanged);
+    _uploader.stateStream.listen(_onUploadStateChanged);
+    _pinChanger.stateStream.listen(_onPinChangeStateChanged);
+    _uploadCapabilityObserver.stateStream
+        .listen(_onUploadCapabilityStateChanged);
   }
 
   final BleSerial _bleSerial;
-  late final BleFlagsReader _bleFlagsReader;
-  late final BleInfoReader _bleInfoReader;
-  late final HttpInfoReader _httpInfoReader;
-  late final BleUploader _bleUploader;
-  late final BlePinChanger _blePinChanger;
-  late final BleFlagsObserver _bleFlagsObserver;
+  late final DeviceCapabilitiesReader _deviceCapabilitiesReader;
+  late final DeviceInfoReader _deviceInfoReader;
+  late final RemoteInfoReader _remoteInfoReader;
+  late final Uploader _uploader;
+  late final PinChanger _pinChanger;
+  late final UploadCapabilityObserver _uploadCapabilityObserver;
   final bool _skipInfoReading;
   String? _manufacturesDictUrl;
   BleOtaState _state = BleOtaState(
-    deviceFlags: DeviceFlags(),
+    deviceCapabilities: DeviceCapabilities(),
     remoteInfo: RemoteInfo(),
   );
 
@@ -75,14 +77,14 @@ class BleOta extends StatefulNotifier<BleOtaState> {
   void init() {
     _state = BleOtaState(
       status: BleOtaStatus.init,
-      deviceFlags: DeviceFlags(),
+      deviceCapabilities: DeviceCapabilities(),
       remoteInfo: RemoteInfo(),
     );
     notifyState(state);
 
     _bleSerial.startNotifications();
-    _bleFlagsObserver.stop();
-    _bleFlagsReader.read();
+    _uploadCapabilityObserver.stop();
+    _deviceCapabilitiesReader.read();
   }
 
   Future<void> uploadBytes({required Uint8List bytes}) async {
@@ -112,24 +114,24 @@ class BleOta extends StatefulNotifier<BleOtaState> {
   }
 
   void setPin({required int pin}) {
-    _bleFlagsObserver.stop();
+    _uploadCapabilityObserver.stop();
     _state.status = BleOtaStatus.pinChange;
     notifyState(state);
-    _blePinChanger.set(pin: pin);
+    _pinChanger.set(pin: pin);
   }
 
   void removePin() {
-    _bleFlagsObserver.stop();
+    _uploadCapabilityObserver.stop();
     _state.status = BleOtaStatus.pinChange;
     notifyState(state);
-    _blePinChanger.remove();
+    _pinChanger.remove();
   }
 
   Future<void> _upload({required Uint8List data, int? size}) async {
-    _bleFlagsObserver.stop();
+    _uploadCapabilityObserver.stop();
     _state.status = BleOtaStatus.upload;
 
-    final isSignatureRequired = state.deviceFlags.signatureRequired;
+    final isSignatureRequired = state.deviceCapabilities.signatureRequired;
     if (isSignatureRequired && !isValidSignedSize(data)) {
       _raiseError(Error.incorrectSignatureSize);
       return;
@@ -137,7 +139,8 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     final signatureData = isSignatureRequired ? getSignature(data) : null;
     final unsignedData = isSignatureRequired ? removeSignature(data) : data;
 
-    final isCompressionSupported = state.deviceFlags.compressionSupported;
+    final isCompressionSupported =
+        state.deviceCapabilities.compressionSupported;
     final isDataCompressed = size != null && size != unsignedData.length;
     if (isDataCompressed && unsignedData.length > size) {
       _raiseError(Error.incorrectCompressedSize);
@@ -156,10 +159,10 @@ class BleOta extends StatefulNotifier<BleOtaState> {
             : unsignedData.length
         : null;
 
-    final isChecksumSupported = state.deviceFlags.checksumSupported;
+    final isChecksumSupported = state.deviceCapabilities.checksumSupported;
     final firmwareCrc = isChecksumSupported ? calcCrc(firmwareData) : null;
 
-    await _bleUploader.upload(
+    await _uploader.upload(
       firmwareData: firmwareData,
       signatureData: signatureData,
       firmwareCrc: firmwareCrc,
@@ -167,20 +170,22 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     );
   }
 
-  void _onDeviceFlagsStateChanged(DeviceFlagsState deviceFlagsState) {
-    if (deviceFlagsState.status == WorkStatus.success) {
-      state.deviceFlags = deviceFlagsState.flags;
-      _bleFlagsObserver.start(uploadEnabled: state.deviceFlags.uploadEnabled);
+  void _onDeviceCapabilitiesStateChanged(
+      DeviceCapabilitiesState deviceCapabilitiesState) {
+    if (deviceCapabilitiesState.status == WorkStatus.success) {
+      state.deviceCapabilities = deviceCapabilitiesState.capabilities;
+      _uploadCapabilityObserver.start(
+          uploadEnabled: state.deviceCapabilities.uploadEnabled);
       if (!_skipInfoReading) {
-        _bleInfoReader.read();
+        _deviceInfoReader.read();
       } else {
         state.status = BleOtaStatus.initialized;
         notifyState(state);
       }
-    } else if (deviceFlagsState.status == WorkStatus.error) {
+    } else if (deviceCapabilitiesState.status == WorkStatus.error) {
       _raiseError(
-        deviceFlagsState.error,
-        errorCode: deviceFlagsState.errorCode,
+        deviceCapabilitiesState.error,
+        errorCode: deviceCapabilitiesState.errorCode,
       );
     }
   }
@@ -189,7 +194,7 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     if (deviceInfoState.status == WorkStatus.success) {
       state.deviceInfo = deviceInfoState.info;
       if (_manufacturesDictUrl != null) {
-        _httpInfoReader.read(state.deviceInfo, _manufacturesDictUrl!);
+        _remoteInfoReader.read(state.deviceInfo, _manufacturesDictUrl!);
       } else {
         state.status = BleOtaStatus.initialized;
         notifyState(state);
@@ -209,39 +214,42 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     }
   }
 
-  void _onBleUploadStateChanged(BleUploadState bleUploadState) {
-    state.uploadProgress = bleUploadState.progress;
-    if (bleUploadState.status == BleUploadStatus.success) {
+  void _onUploadStateChanged(UploadState uploadState) {
+    state.uploadProgress = uploadState.progress;
+    if (uploadState.status == UploadStatus.success) {
       state.status = BleOtaStatus.uploaded;
       notifyState(state);
-    } else if (bleUploadState.status == BleUploadStatus.error) {
-      _raiseError(bleUploadState.error, errorCode: bleUploadState.errorCode);
+    } else if (uploadState.status == UploadStatus.error) {
+      _raiseError(uploadState.error, errorCode: uploadState.errorCode);
     } else {
       notifyState(state);
     }
   }
 
-  void _onBlePinChangeStateChanged(BlePinChangeState blePinChangeState) {
-    if (blePinChangeState.status == WorkStatus.success) {
+  void _onPinChangeStateChanged(PinChangeState pinChangeState) {
+    if (pinChangeState.status == WorkStatus.success) {
       state.status = BleOtaStatus.pinChanged;
-      _bleFlagsObserver.start(uploadEnabled: state.deviceFlags.uploadEnabled);
+      _uploadCapabilityObserver.start(
+          uploadEnabled: state.deviceCapabilities.uploadEnabled);
       notifyState(state);
-    } else if (blePinChangeState.status == WorkStatus.error) {
+    } else if (pinChangeState.status == WorkStatus.error) {
       _raiseError(
-        blePinChangeState.error,
-        errorCode: blePinChangeState.errorCode,
+        pinChangeState.error,
+        errorCode: pinChangeState.errorCode,
       );
     }
   }
 
-  void _onDeviceObserverStateChanged(DeviceObserverState deviceObserverState) {
-    if (deviceObserverState.status != WorkStatus.error) {
-      state.deviceFlags.uploadEnabled = deviceObserverState.uploadEnabled;
+  void _onUploadCapabilityStateChanged(
+      UploadCapabilityState uploadCapabilityState) {
+    if (uploadCapabilityState.status != WorkStatus.error) {
+      state.deviceCapabilities.uploadEnabled =
+          uploadCapabilityState.uploadEnabled;
       notifyState(state);
     } else {
       _raiseError(
-        deviceObserverState.error,
-        errorCode: deviceObserverState.errorCode,
+        uploadCapabilityState.error,
+        errorCode: uploadCapabilityState.errorCode,
       );
     }
   }
@@ -250,7 +258,7 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     state.status = BleOtaStatus.error;
     state.error = error;
     state.errorCode = errorCode;
-    state.deviceFlags.uploadEnabled = false;
+    state.deviceCapabilities.uploadEnabled = false;
     notifyState(state);
   }
 
@@ -266,13 +274,13 @@ class BleOtaState extends WorkState<BleOtaStatus, Error> {
   BleOtaState({
     super.status = BleOtaStatus.idle,
     super.error = Error.unknown,
-    required this.deviceFlags,
+    required this.deviceCapabilities,
     this.deviceInfo = const DeviceInfo(),
     required this.remoteInfo,
     this.uploadProgress = 0.0,
   });
 
-  DeviceFlags deviceFlags;
+  DeviceCapabilities deviceCapabilities;
   DeviceInfo deviceInfo;
   RemoteInfo remoteInfo;
   double uploadProgress;
