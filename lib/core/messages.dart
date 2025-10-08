@@ -52,22 +52,33 @@ class ErrorCode {
   static const pinChangeError = 0x61;
 }
 
+class IncorrectMessageSizeException implements Exception {}
+
 class Message {
   final int header;
 
   Message({required this.header});
 
   factory Message.fromBytes(Uint8List data) {
+    if (!_isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
     return Message(header: bytesToUint8(data, 0));
   }
 
-  static bool isValidSize(Uint8List data) => data.length >= headerSize;
+  static bool _isValidSize(Uint8List data) => data.length >= headerSize;
 }
 
-class InitReq extends Message {
-  InitReq() : super(header: HeaderCode.initReq);
+class EmptyMessage extends Message {
+  EmptyMessage({required int header}) : super(header: header);
 
   Uint8List toBytes() => uint8ToBytes(this.header);
+
+  static bool _isValidSize(Uint8List data) => data.length == headerSize;
+}
+
+class InitReq extends EmptyMessage {
+  InitReq() : super(header: HeaderCode.initReq);
 }
 
 class InitRespFlags {
@@ -109,11 +120,13 @@ class InitResp extends Message {
   InitResp({required this.flags}) : super(header: HeaderCode.initResp);
 
   factory InitResp.fromBytes(Uint8List data) {
+    if (!_isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
     return InitResp(flags: InitRespFlags.fromByte(data[_flagsOffset]));
   }
 
-  static bool isValidSize(Uint8List data) => data.length == _size;
-
+  static bool _isValidSize(Uint8List data) => data.length == _size;
   static const int _flagsOffset = headerSize;
   static const int _size = _flagsOffset + BytesSize.uint8;
 }
@@ -170,14 +183,16 @@ class BeginResp extends Message {
   }) : super(header: HeaderCode.beginResp);
 
   factory BeginResp.fromBytes(Uint8List data) {
+    if (!_isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
     return BeginResp(
       packageSize: bytesToUint32(data, _packageSizeOffset),
       bufferSize: bytesToUint32(data, _bufferSizeOffset),
     );
   }
 
-  static bool isValidSize(Uint8List data) => data.length == _size;
-
+  static bool _isValidSize(Uint8List data) => data.length == _size;
   static const int _packageSizeOffset = headerSize;
   static const int _bufferSizeOffset = _packageSizeOffset + BytesSize.uint32;
   static const int _size = _bufferSizeOffset + BytesSize.uint32;
@@ -208,10 +223,15 @@ class PackageReq extends Package {
   }) : super(header: HeaderCode.packageReq, data: data);
 }
 
-class PackageResp extends Message {
+class PackageResp extends EmptyMessage {
   PackageResp() : super(header: HeaderCode.packageResp);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory PackageResp.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return PackageResp();
+  }
 }
 
 class EndReq extends Message {
@@ -227,10 +247,15 @@ class EndReq extends Message {
   }
 }
 
-class EndResp extends Message {
+class EndResp extends EmptyMessage {
   EndResp() : super(header: HeaderCode.endResp);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory EndResp.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return EndResp();
+  }
 }
 
 class ErrorInd extends Message {
@@ -241,27 +266,39 @@ class ErrorInd extends Message {
   }) : super(header: HeaderCode.errorInd);
 
   factory ErrorInd.fromBytes(Uint8List data) {
+    if (!_isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
     return ErrorInd(
       code: data[_codeOffset],
     );
   }
 
-  static bool isValidSize(Uint8List data) => data.length == _size;
-
+  static bool _isValidSize(Uint8List data) => data.length == _size;
   static const int _codeOffset = headerSize;
   static const int _size = _codeOffset + BytesSize.uint8;
 }
 
-class UploadEnableInd extends Message {
+class UploadEnableInd extends EmptyMessage {
   UploadEnableInd() : super(header: HeaderCode.uploadEnableInd);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory UploadEnableInd.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return UploadEnableInd();
+  }
 }
 
-class UploadDisableInd extends Message {
+class UploadDisableInd extends EmptyMessage {
   UploadDisableInd() : super(header: HeaderCode.uploadDisableInd);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory UploadDisableInd.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return UploadDisableInd();
+  }
 }
 
 class SignatureReq extends Package {
@@ -270,10 +307,15 @@ class SignatureReq extends Package {
   }) : super(header: HeaderCode.signatureReq, data: data);
 }
 
-class SignatureResp extends Message {
+class SignatureResp extends EmptyMessage {
   SignatureResp() : super(header: HeaderCode.signatureResp);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory SignatureResp.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return SignatureResp();
+  }
 }
 
 class SetPinReq extends Message {
@@ -289,20 +331,28 @@ class SetPinReq extends Message {
   }
 }
 
-class SetPinResp extends Message {
+class SetPinResp extends EmptyMessage {
   SetPinResp() : super(header: HeaderCode.setPinResp);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory SetPinResp.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return SetPinResp();
+  }
 }
 
-class RemovePinReq extends Message {
+class RemovePinReq extends EmptyMessage {
   RemovePinReq() : super(header: HeaderCode.removePinReq);
-
-  Uint8List toBytes() => uint8ToBytes(this.header);
 }
 
-class RemovePinResp extends Message {
+class RemovePinResp extends EmptyMessage {
   RemovePinResp() : super(header: HeaderCode.removePinResp);
 
-  static bool isValidSize(Uint8List data) => data.length == headerSize;
+  factory RemovePinResp.fromBytes(Uint8List data) {
+    if (!EmptyMessage._isValidSize(data)) {
+      throw IncorrectMessageSizeException();
+    }
+    return RemovePinResp();
+  }
 }

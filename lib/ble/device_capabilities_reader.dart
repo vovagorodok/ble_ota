@@ -36,30 +36,24 @@ class DeviceCapabilitiesReader
   }
 
   void _handleMessage(Uint8List data) {
-    if (!Message.isValidSize(data)) {
+    try {
+      final header = Message.fromBytes(data).header;
+
+      switch (header) {
+        case HeaderCode.initResp:
+          _handleInitResp(InitResp.fromBytes(data));
+          break;
+        case HeaderCode.errorInd:
+          _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code));
+          break;
+        default:
+          _raiseError(
+            Error.unexpectedDeviceResponse,
+            errorCode: header,
+          );
+      }
+    } on IncorrectMessageSizeException {
       _raiseError(Error.incorrectMessageSize);
-      return;
-    }
-
-    final message = Message.fromBytes(data);
-    final header = message.header;
-
-    switch (header) {
-      case HeaderCode.initResp:
-        InitResp.isValidSize(data)
-            ? _handleInitResp(InitResp.fromBytes(data))
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.errorInd:
-        ErrorInd.isValidSize(data)
-            ? _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code))
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      default:
-        _raiseError(
-          Error.unexpectedDeviceResponse,
-          errorCode: header,
-        );
     }
   }
 

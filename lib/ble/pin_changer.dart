@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:ble_backend/ble_serial.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/work_state.dart';
+import 'package:ble_ota/core/errors_map.dart';
 import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/messages.dart';
 import 'package:ble_ota/core/state.dart';
@@ -31,31 +32,27 @@ class PinChanger extends StatefulNotifier<PinChangeState> {
   }
 
   void _handleMessage(Uint8List data) {
-    if (!Message.isValidSize(data)) {
+    try {
+      final header = Message.fromBytes(data).header;
+
+      switch (header) {
+        case HeaderCode.setPinResp:
+          _handleResp(SetPinResp.fromBytes(data));
+          break;
+        case HeaderCode.removePinResp:
+          _handleResp(RemovePinResp.fromBytes(data));
+          break;
+        case HeaderCode.errorInd:
+          _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code));
+          break;
+        default:
+          _raiseError(
+            Error.unexpectedDeviceResponse,
+            errorCode: header,
+          );
+      }
+    } on IncorrectMessageSizeException {
       _raiseError(Error.incorrectMessageSize);
-      return;
-    }
-
-    final message = Message.fromBytes(data);
-    final header = message.header;
-
-    if (state.status != WorkStatus.working) {
-      _raiseError(
-        Error.unexpectedDeviceResponse,
-        errorCode: header,
-      );
-      return;
-    }
-
-    if (header == HeaderCode.setPinResp || header == HeaderCode.removePinResp) {
-      _unsubscribe();
-      state.status = WorkStatus.success;
-      notifyState(state);
-    } else {
-      _raiseError(
-        Error.unexpectedDeviceResponse,
-        errorCode: header,
-      );
     }
   }
 
@@ -63,6 +60,20 @@ class PinChanger extends StatefulNotifier<PinChangeState> {
     _subscription = _bleSerial.dataStream.listen(_handleMessage);
 
     _state = PinChangeState(status: WorkStatus.working);
+    notifyState(state);
+  }
+
+  void _handleResp(Message resp) {
+    if (state.status != WorkStatus.working) {
+      _raiseError(
+        Error.unexpectedDeviceResponse,
+        errorCode: resp.header,
+      );
+      return;
+    }
+
+    _unsubscribe();
+    state.status = WorkStatus.success;
     notifyState(state);
   }
 

@@ -34,44 +34,36 @@ class UploadCapabilityObserver extends StatefulNotifier<UploadCapabilityState> {
   }
 
   void _handleMessage(Uint8List data) {
-    if (!Message.isValidSize(data)) {
+    try {
+      final header = Message.fromBytes(data).header;
+
+      switch (header) {
+        case HeaderCode.uploadEnableInd:
+          _handleUploadEnableInd(UploadEnableInd.fromBytes(data));
+          break;
+        case HeaderCode.uploadDisableInd:
+          _handleUploadDisableInd(UploadDisableInd.fromBytes(data));
+          break;
+        case HeaderCode.errorInd:
+          _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code));
+          break;
+        default:
+          _raiseError(
+            Error.unexpectedDeviceResponse,
+            errorCode: header,
+          );
+      }
+    } on IncorrectMessageSizeException {
       _raiseError(Error.incorrectMessageSize);
-      return;
-    }
-
-    final message = Message.fromBytes(data);
-    final header = message.header;
-
-    switch (header) {
-      case HeaderCode.uploadEnableInd:
-        UploadEnableInd.isValidSize(data)
-            ? _handleUploadEnableInd()
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.uploadDisableInd:
-        UploadDisableInd.isValidSize(data)
-            ? _handleUploadDisableInd()
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.errorInd:
-        ErrorInd.isValidSize(data)
-            ? _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code))
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      default:
-        _raiseError(
-          Error.unexpectedDeviceResponse,
-          errorCode: header,
-        );
     }
   }
 
-  void _handleUploadEnableInd() {
+  void _handleUploadEnableInd(UploadEnableInd ind) {
     state.uploadEnabled = true;
     notifyState(state);
   }
 
-  void _handleUploadDisableInd() {
+  void _handleUploadDisableInd(UploadDisableInd ind) {
     state.uploadEnabled = false;
     notifyState(state);
   }

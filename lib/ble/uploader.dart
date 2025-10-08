@@ -68,53 +68,38 @@ class Uploader extends StatefulNotifier<UploadState> {
   }
 
   void _handleMessage(Uint8List data) {
-    if (!Message.isValidSize(data)) {
+    try {
+      final header = Message.fromBytes(data).header;
+
+      switch (header) {
+        case HeaderCode.beginResp:
+          _handleBeginResp(BeginResp.fromBytes(data));
+          break;
+        case HeaderCode.packageResp:
+          _handlePackageResp(PackageResp.fromBytes(data));
+          break;
+        case HeaderCode.signatureResp:
+          _handleSignatureResp(SignatureResp.fromBytes(data));
+          break;
+        case HeaderCode.endResp:
+          _handleEndResp(EndResp.fromBytes(data));
+          break;
+        case HeaderCode.uploadEnableInd:
+          break;
+        case HeaderCode.uploadDisableInd:
+          _raiseError(Error.uploadStopped);
+          break;
+        case HeaderCode.errorInd:
+          _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code));
+          break;
+        default:
+          _raiseError(
+            Error.unexpectedDeviceResponse,
+            errorCode: header,
+          );
+      }
+    } on IncorrectMessageSizeException {
       _raiseError(Error.incorrectMessageSize);
-      return;
-    }
-
-    final message = Message.fromBytes(data);
-    final header = message.header;
-
-    switch (header) {
-      case HeaderCode.beginResp:
-        BeginResp.isValidSize(data)
-            ? _handleBeginResp(BeginResp.fromBytes(data))
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.packageResp:
-        PackageResp.isValidSize(data)
-            ? _handlePackageResp(PackageResp())
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.signatureResp:
-        SignatureResp.isValidSize(data)
-            ? _handleSignatureResp(SignatureResp())
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.endResp:
-        EndResp.isValidSize(data)
-            ? _handleEndResp(EndResp())
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.uploadEnableInd:
-        if (!UploadEnableInd.isValidSize(data))
-          _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.uploadDisableInd:
-        if (!UploadDisableInd.isValidSize(data))
-          _raiseError(Error.incorrectMessageSize);
-        break;
-      case HeaderCode.errorInd:
-        ErrorInd.isValidSize(data)
-            ? _raiseError(determineErrorCode(ErrorInd.fromBytes(data).code))
-            : _raiseError(Error.incorrectMessageSize);
-        break;
-      default:
-        _raiseError(
-          Error.unexpectedDeviceResponse,
-          errorCode: header,
-        );
     }
   }
 
