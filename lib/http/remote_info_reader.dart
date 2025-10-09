@@ -1,16 +1,17 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:http/http.dart' as http;
-import 'package:yaml/yaml.dart';
 import 'package:ble_backend/state_notifier.dart';
 import 'package:ble_backend/work_state.dart';
-import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/device_info.dart';
+import 'package:ble_ota/core/errors.dart';
 import 'package:ble_ota/core/remote_info.dart';
 import 'package:ble_ota/core/software.dart';
+import 'package:ble_ota/core/state.dart';
+import 'package:http/http.dart' as http;
+import 'package:yaml/yaml.dart';
 
-class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
+class RemoteInfoReader extends StatefulNotifier<RemoteInfoState> {
   RemoteInfoState _state = RemoteInfoState(info: RemoteInfo());
 
   @override
@@ -29,7 +30,7 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
             await http.get(Uri.parse(manufacturesDictUrl));
         if (manufacturesResponse.statusCode != 200) {
           _raiseError(
-            InfoError.unexpectedNetworkResponse,
+            Error.unexpectedNetworkResponse,
             errorCode: manufacturesResponse.statusCode,
           );
           return;
@@ -39,7 +40,6 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
 
         final hardwaresUrl = manufacturesBody[deviceInfo.manufactureName];
         if (hardwaresUrl == null) {
-          state.info.isHardwareUnregistered = true;
           state.status = WorkStatus.success;
           notifyState(state);
           return;
@@ -48,7 +48,7 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
         final hardwaresResponse = await http.get(Uri.parse(hardwaresUrl));
         if (hardwaresResponse.statusCode != 200) {
           _raiseError(
-            InfoError.unexpectedNetworkResponse,
+            Error.unexpectedNetworkResponse,
             errorCode: hardwaresResponse.statusCode,
           );
           return;
@@ -57,7 +57,6 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
 
         final hardwareUrl = hardwaresBody[deviceInfo.hardwareName];
         if (hardwareUrl == null) {
-          state.info.isHardwareUnregistered = true;
           state.status = WorkStatus.success;
           notifyState(state);
           return;
@@ -65,7 +64,7 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
 
         await _readSoftwares(deviceInfo, hardwareUrl);
       } catch (_) {
-        _raiseError(InfoError.generalNetworkError);
+        _raiseError(Error.networkError);
       }
     }.call();
   }
@@ -92,7 +91,7 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
       final response = await http.get(Uri.parse(hardwareUrl));
       if (response.statusCode != 200) {
         _raiseError(
-          InfoError.unexpectedNetworkResponse,
+          Error.unexpectedNetworkResponse,
           errorCode: response.statusCode,
         );
         return;
@@ -101,12 +100,12 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
       final body = _loadDict(hardwareUrl, response.body);
       if (!body.containsKey("hardware_name") ||
           !body.containsKey("softwares")) {
-        _raiseError(InfoError.incorrectFileFormat);
+        _raiseError(Error.incorrectNetworkFile);
         return;
       }
       _state.info.hardwareName = body["hardware_name"];
       if (_state.info.hardwareName != deviceInfo.hardwareName) {
-        _raiseError(InfoError.incorrectFileFormat);
+        _raiseError(Error.incorrectNetworkFile);
         return;
       }
       _state.info.hardwareIcon = body["hardware_icon"];
@@ -129,10 +128,11 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
       state.info.softwareList = filteredByHardwareList;
 
       _readNewestSoftware(deviceInfo);
+      state.info.isAvailable = true;
       state.status = WorkStatus.success;
       notifyState(state);
     } catch (_) {
-      _raiseError(InfoError.generalNetworkError);
+      _raiseError(Error.networkError);
     }
   }
 
@@ -141,7 +141,7 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
           ? loadYaml(body)
           : jsonDecode(body);
 
-  void _raiseError(InfoError error, {int errorCode = 0}) {
+  void _raiseError(Error error, {int errorCode = 0}) {
     state.status = WorkStatus.error;
     state.error = error;
     state.errorCode = errorCode;
@@ -149,10 +149,10 @@ class HttpInfoReader extends StatefulNotifier<RemoteInfoState> {
   }
 }
 
-class RemoteInfoState extends WorkState<WorkStatus, InfoError> {
+class RemoteInfoState extends State {
   RemoteInfoState({
     super.status = WorkStatus.idle,
-    super.error = InfoError.unknown,
+    super.error = Error.unknown,
     required this.info,
   });
 

@@ -1,3 +1,9 @@
+## 2.0.0
+
+* Added compression support
+* Added signature support
+* Made protocol more extendible
+
 ## 1.1.1
 
 * Upgrade dependencies

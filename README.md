@@ -7,28 +7,26 @@ Full example at: https://github.com/vovagorodok/ble_ota_app
 
 Scan configuration:
 ```dart
-import 'package:ble_ota/ble/ble_uuids.dart';
+import 'package:ble_ota/ble/uuids.dart';
 
 final bleScanner = bleCentral.createScanner(serviceIds: [serviceUuid]);
 ```
 
-Read info:
+Init:
 ```dart
-infoReader = InfoReader(bleConnector: bleConnector);
-infoReader.stateStream.listen((state) => print("Read state changed: ${state.status}"));
-infoReader.read(manufacturesDictUrl: manufacturesDictUrl);
+bleOta = BleOta(bleConnector: bleConnector);
+bleOta.stateStream.listen((state) => print("State changed: ${state.status}"));
+bleOta.init();
 ```
 
 Upload local binary:
 ```dart
-uploader = Uploader(bleConnector: bleConnector);
-uploader.stateStream.listen((state) => print("Upload state changed: ${state.status}"));
-uploader.uploadLocalFile(localPath: localPath, maxMtu: maxMtu);
+bleOta.uploadLocalFile(localPath: localPath);
 ```
 
 Upload remote binary:
 ```dart
-print("Hardware name: ${infoReader.state.deviceInfo.hardwareName}");
-if (infoReader.state.remoteInfo.newestSoftware != null)
-  uploader.uploadHttpFile(url: infoReader.state.remoteInfo.newestSoftware.path!, maxMtu: maxMtu);
+print("Hardware name: ${bleOta.state.deviceInfo.hardwareName}");
+if (bleOta.state.remoteInfo.newestSoftware != null)
+  bleOta.uploadHttpFile(url: bleOta.state.remoteInfo.newestSoftware.path!);
 ```

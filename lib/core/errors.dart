@@ -1,27 +1,36 @@
-enum UploadError {
+enum Error {
   unknown,
-  generalDeviceError,
-  incorrectPackageFormat,
+
+  deviceError,
+  noDeviceResponse,
+  unexpectedDeviceResponse,
+  incorrectDeviceResponse,
+
+  networkError,
+  unexpectedNetworkResponse,
+  incorrectNetworkFile,
+
+  incorrectMessageSize,
+  incorrectMessageHeader,
   incorrectFirmwareSize,
-  incorrectChecksum,
-  internalSrorageError,
+  internalStorageError,
   uploadDisabled,
-  noDeviceResponse,
-  unexpectedDeviceResponse,
-  unexpectedNetworkResponse,
-  generalNetworkError,
-}
-
-enum InfoError {
-  unknown,
-  incorrectFileFormat,
-  unexpectedNetworkResponse,
-  generalNetworkError,
-}
-
-enum PinChangeError {
-  unknown,
-  generalDeviceError,
-  noDeviceResponse,
-  unexpectedDeviceResponse,
+  uploadRunning,
+  uploadStopped,
+  installRunning,
+  bufferDisabled,
+  bufferOverflow,
+  compressionNotSupported,
+  incorrectCompression,
+  incorrectCompressedSize,
+  incorrectCompressionChecksum,
+  incorrectCompressionParam,
+  incorrectCompressionEnd,
+  checksumNotSupported,
+  incorrectChecksum,
+  signatureNotSupported,
+  incorrectSignature,
+  incorrectSignatureSize,
+  pinNotSupported,
+  pinChangeError,
 }
