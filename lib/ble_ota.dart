@@ -88,15 +88,24 @@ class BleOta extends StatefulNotifier<BleOtaState> {
   }
 
   Future<void> uploadBytes({required Uint8List bytes}) async {
+    _state.status = BleOtaStatus.upload;
+    notifyState(state);
+
     await _upload(data: bytes);
   }
 
   Future<void> uploadLocalFile({required String localPath}) async {
+    _state.status = BleOtaStatus.upload;
+    notifyState(state);
+
     File file = File(localPath);
     await _upload(data: await file.readAsBytes());
   }
 
   Future<void> uploadHttpFile({required String url, int? size}) async {
+    _state.status = BleOtaStatus.upload;
+    notifyState(state);
+
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode != 200) {
@@ -129,7 +138,6 @@ class BleOta extends StatefulNotifier<BleOtaState> {
 
   Future<void> _upload({required Uint8List data, int? size}) async {
     _uploadCapabilityObserver.stop();
-    _state.status = BleOtaStatus.upload;
 
     final isSignatureRequired = state.deviceCapabilities.signatureRequired;
     if (isSignatureRequired && !isValidSignedSize(data)) {

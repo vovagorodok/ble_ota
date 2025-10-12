@@ -1,3 +1,7 @@
+## 2.0.1
+
+* Faster upload indication
+
 ## 2.0.0
 
 * Added compression support
