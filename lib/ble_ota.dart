@@ -74,7 +74,7 @@ class BleOta extends StatefulNotifier<BleOtaState> {
   @override
   BleOtaState get state => _state;
 
-  void init() {
+  Future<void> init() async {
     _state = BleOtaState(
       status: BleOtaStatus.init,
       deviceCapabilities: DeviceCapabilities(),
@@ -82,7 +82,7 @@ class BleOta extends StatefulNotifier<BleOtaState> {
     );
     notifyState(state);
 
-    _bleSerial.startNotifications();
+    await _bleSerial.startNotifications();
     _uploadCapabilityObserver.stop();
     _deviceCapabilitiesReader.read();
   }
@@ -154,18 +154,25 @@ class BleOta extends StatefulNotifier<BleOtaState> {
       _raiseError(Error.incorrectCompressedSize);
       return;
     }
-    final firmwareData = isCompressionSupported
-        ? isDataCompressed
-            ? unsignedData
-            : compress(unsignedData)
-        : isDataCompressed
+    final canCompress = isCompressionSupportedByPlatform();
+    if (!canCompress && !isCompressionSupported && isDataCompressed) {
+      _raiseError(Error.compressionNotSupported);
+      return;
+    }
+    final isCompressionRequired =
+        canCompress && isCompressionSupported && !isDataCompressed;
+    final isDecompressionRequired =
+        canCompress && !isCompressionSupported && isDataCompressed;
+    final firmwareData = isCompressionRequired
+        ? compress(unsignedData)
+        : isDecompressionRequired
             ? decompress(unsignedData)
             : unsignedData;
-    final decompressedSize = isCompressionSupported
-        ? isDataCompressed
+    final decompressedSize = isCompressionRequired
+        ? unsignedData.length
+        : !isDecompressionRequired && isDataCompressed
             ? size
-            : unsignedData.length
-        : null;
+            : null;
 
     final isChecksumSupported = state.deviceCapabilities.checksumSupported;
     final firmwareCrc = isChecksumSupported ? calcCrc(firmwareData) : null;

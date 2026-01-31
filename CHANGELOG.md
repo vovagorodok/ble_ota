@@ -1,3 +1,7 @@
+## 2.0.2
+
+* Fixed web support
+
 ## 2.0.1
 
 * Faster upload indication
