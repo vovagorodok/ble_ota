@@ -143,7 +143,7 @@ class Uploader extends StatefulNotifier<UploadState> {
 
   void _sendPackages() async {
     while (_currentDataPos < _firmwareData.length) {
-      final packageData = _getPackege(_firmwareData);
+      final packageData = _getPackage(_firmwareData);
       final packageSize = packageData.length;
       _currentDataPos += packageSize;
       _currentBufferSize += packageSize;
@@ -203,7 +203,7 @@ class Uploader extends StatefulNotifier<UploadState> {
       return;
     }
 
-    final packageData = _getPackege(signatureData);
+    final packageData = _getPackage(signatureData);
     _currentDataPos += packageData.length;
 
     _sendMessage(SignatureReq(data: packageData).toBytes());
@@ -257,7 +257,7 @@ class Uploader extends StatefulNotifier<UploadState> {
     return _maxBufferSize ?? MaxValue.uint32;
   }
 
-  Uint8List _getPackege(Uint8List data) {
+  Uint8List _getPackage(Uint8List data) {
     final packageSize = min(data.length - _currentDataPos, _packageSize);
     final packageEndPos = _currentDataPos + packageSize;
     final packageData = data.sublist(_currentDataPos, packageEndPos);
